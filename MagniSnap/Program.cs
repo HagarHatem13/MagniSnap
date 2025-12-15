@@ -57,7 +57,72 @@ namespace MagniSnap
                 Console.WriteLine();
             }
 
-            Console.WriteLine("Test completed successfully!");
+            // Test Dijkstra's algorithm: Calculate shortest paths from anchor pixel
+            Console.WriteLine("\n=== Testing Dijkstra's Algorithm ===");
+            
+            // Set anchor pixel at position (0, 0) - pixel ID 0
+            int anchorPixelId = 0;
+            Console.WriteLine($"Calculating shortest paths from anchor pixel {anchorPixelId} (coordinates: {graph.IdToPixel(anchorPixelId)})...");
+            
+            var (distances, parents) = graph.CalculateShortestPathsFromAnchor(anchorPixelId);
+            
+            Console.WriteLine("\nShortest distances from anchor:");
+            for (int i = 0; i < distances.Length; i++)
+            {
+                if (distances[i] < double.MaxValue)
+                {
+                    var (x, y) = graph.IdToPixel(i);
+                    Console.WriteLine($"  Pixel {i} ({x}, {y}): distance = {distances[i]:F6}");
+                }
+            }
+
+            // Test backtracking: Find path from a free point to anchor
+            Console.WriteLine("\n=== Testing Path Backtracking ===");
+            
+            // Test backtracking from pixel at position (2, 2) - pixel ID 8
+            int freePointId = 8;
+            var (freeX, freeY) = graph.IdToPixel(freePointId);
+            Console.WriteLine($"Backtracking path from free point {freePointId} ({freeX}, {freeY}) to anchor {anchorPixelId}...");
+            
+            List<int> path = graph.BacktrackPath(freePointId, parents, anchorPixelId);
+            
+            if (path.Count > 0)
+            {
+                Console.WriteLine($"Path found with {path.Count} pixels:");
+                foreach (int pixelId in path)
+                {
+                    var (x, y) = graph.IdToPixel(pixelId);
+                    Console.WriteLine($"  Pixel {pixelId}: ({x}, {y})");
+                }
+            }
+            else
+            {
+                Console.WriteLine("No path found from free point to anchor.");
+            }
+
+            // Test with another free point
+            int freePointId2 = 4; // Center pixel (1, 1)
+            var (freeX2, freeY2) = graph.IdToPixel(freePointId2);
+            Console.WriteLine($"\nBacktracking path from free point {freePointId2} ({freeX2}, {freeY2}) to anchor {anchorPixelId}...");
+            
+            List<int> path2 = graph.BacktrackPath(freePointId2, parents, anchorPixelId);
+            
+            if (path2.Count > 0)
+            {
+                Console.WriteLine($"Path found with {path2.Count} pixels:");
+                foreach (int pixelId in path2)
+                {
+                    var (x, y) = graph.IdToPixel(pixelId);
+                    Console.WriteLine($"  Pixel {pixelId}: ({x}, {y})");
+                }
+            }
+            else
+            {
+                Console.WriteLine("No path found from free point to anchor.");
+            }
+
+            Console.WriteLine("\nTest completed successfully!");
+            Console.WriteLine("Press any key to continue to the application...");
             Console.Read();
         
         #region Do Change Remove Template Code

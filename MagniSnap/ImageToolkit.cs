@@ -35,7 +35,7 @@ namespace MagniSnap
     /// <summary>
     /// Library of static functions that deal with images
     /// </summary>
-
+    //Salma&Dania
     public class PixelGraph
     {
         public int Width { get; }
@@ -108,6 +108,229 @@ namespace MagniSnap
         {
             Graph[u].Add((v, weight));
             Graph[v].Add((u, weight));
+        }
+
+       
+        private class MinHeap
+        {
+            private List<(int vertex, double distance)> heap;
+            private int size;
+
+            public MinHeap()
+            {
+                heap = new List<(int, double)>();
+                size = 0;
+            }
+
+            public int Count => size;
+
+            public bool IsEmpty => size == 0;
+
+            public void Insert(int vertex, double distance)
+            {
+                if (size < heap.Count)
+                {
+                    heap[size] = (vertex, distance);
+                }
+                else
+                {
+                    heap.Add((vertex, distance));
+                }
+                size++;
+                HeapifyUp(size - 1);
+            }
+
+            public (int vertex, double distance) ExtractMin()
+            {
+                if (size == 0)
+                    throw new InvalidOperationException("Heap is empty");
+
+                (int vertex, double distance) min = heap[0];
+                heap[0] = heap[size - 1];
+                size--;
+
+                if (size > 0)
+                    HeapifyDown(0);
+
+                return min;
+            }
+
+            private void HeapifyUp(int index)
+            {
+                while (index > 0)
+                {
+                    int parent = (index - 1) / 2;
+                    if (heap[parent].distance <= heap[index].distance)
+                        break;
+
+                    Swap(parent, index);
+                    index = parent;
+                }
+            }
+
+            private void HeapifyDown(int index)
+            {
+                while (true)
+                {
+                    int smallest = index;
+                    int left = 2 * index + 1;
+                    int right = 2 * index + 2;
+
+                    if (left < size && heap[left].distance < heap[smallest].distance)
+                        smallest = left;
+
+                    if (right < size && heap[right].distance < heap[smallest].distance)
+                        smallest = right;
+
+                    if (smallest == index)
+                        break;
+
+                    Swap(index, smallest);
+                    index = smallest;
+                }
+            }
+
+            private void Swap(int i, int j)
+            {
+                var temp = heap[i];
+                heap[i] = heap[j];
+                heap[j] = temp;
+            }
+        }
+
+        /// <summary>
+        /// Calculate shortest paths from an anchor pixel to all pixels using Dijkstra's algorithm.
+        /// Time complexity: O(E' lg(V')) where V' and E' are vertices and edges checked until reaching destination.
+        /// </summary>
+        /// <param name="anchorPixelId">The ID of the anchor pixel (vertex)</param>
+        /// <returns>
+        /// A tuple containing:
+        /// - distances: array of shortest distances from anchor to each pixel (double.MaxValue if unreachable)
+        /// - parents: array of parent vertex IDs for path reconstruction (-1 if no parent)
+        /// </returns>
+        public (double[] distances, int[] parents) CalculateShortestPathsFromAnchor(int anchorPixelId)
+        {
+            int totalNodes = Width * Height;
+            
+            if (anchorPixelId < 0 || anchorPixelId >= totalNodes)
+                throw new ArgumentException("Invalid anchor pixel ID", nameof(anchorPixelId));
+
+            // Initialize distances and parents
+            double[] distances = new double[totalNodes];
+            int[] parents = new int[totalNodes];
+            bool[] visited = new bool[totalNodes];
+
+            for (int i = 0; i < totalNodes; i++)
+            {
+                distances[i] = double.MaxValue;
+                parents[i] = -1;
+                visited[i] = false;
+            }
+
+            distances[anchorPixelId] = 0.0;
+
+            // Use min-heap as priority queue
+            MinHeap priorityQueue = new MinHeap();
+            priorityQueue.Insert(anchorPixelId, 0.0);
+
+            while (!priorityQueue.IsEmpty)
+            {
+                // Extract minimum distance vertex
+                var (u, dist) = priorityQueue.ExtractMin();
+
+                // Skip if already processed or if this entry is stale (distance doesn't match)
+                if (visited[u] || dist > distances[u])
+                    continue;
+
+                visited[u] = true;
+
+                // Relax all neighbors
+                foreach (var (neighborId, weight) in Graph[u])
+                {
+                    if (!visited[neighborId])
+                    {
+                        double newDistance = distances[u] + weight;
+
+                        if (newDistance < distances[neighborId])
+                        {
+                            distances[neighborId] = newDistance;
+                            parents[neighborId] = u;
+
+                            // Add new entry (duplicates are allowed, we'll skip stale ones)
+                            priorityQueue.Insert(neighborId, newDistance);
+                        }
+                    }
+                }
+            }
+
+            return (distances, parents);
+        }
+
+        /// <summary>
+        /// Backtrack the shortest path from a free point (mouse position) to the anchor point.
+        /// Time complexity: O(N) where N is the length of the path.
+        /// </summary>
+        /// <param name="freePointId">The ID of the free point (mouse position pixel)</param>
+        /// <param name="parents">The parent array from CalculateShortestPathsFromAnchor</param>
+        /// <param name="anchorPixelId">The ID of the anchor pixel</param>
+        /// <returns>
+        /// A list of pixel IDs representing the path from freePointId to anchorPixelId.
+        /// Returns empty list if no path exists.
+        /// </returns>
+        public List<int> BacktrackPath(int freePointId, int[] parents, int anchorPixelId)
+        {
+            List<int> path = new List<int>();
+
+            if (freePointId < 0 || freePointId >= Width * Height)
+                return path;
+
+            if (parents == null || parents.Length != Width * Height)
+                throw new ArgumentException("Invalid parents array", nameof(parents));
+
+            // Backtrack from free point to anchor
+            int current = freePointId;
+            bool reachedAnchor = false;
+
+            while (current != -1)
+            {
+                path.Add(current);
+
+                if (current == anchorPixelId)
+                {
+                    reachedAnchor = true;
+                    break;
+                }
+
+                current = parents[current];
+            }
+
+            // If we didn't reach the anchor, no valid path exists
+            if (!reachedAnchor)
+                path.Clear();
+
+            return path;
+        }
+
+        /// <summary>
+        /// Convert pixel coordinates (x, y) to pixel ID
+        /// </summary>
+        public int PixelToId(int x, int y)
+        {
+            if (x < 0 || x >= Width || y < 0 || y >= Height)
+                throw new ArgumentException("Invalid pixel coordinates");
+            return y * Width + x;
+        }
+
+        /// <summary>
+        /// Convert pixel ID to pixel coordinates (x, y)
+        /// </summary>
+        public (int x, int y) IdToPixel(int pixelId)
+        {
+            if (pixelId < 0 || pixelId >= Width * Height)
+                throw new ArgumentException("Invalid pixel ID");
+            int y = pixelId / Width;
+            int x = pixelId % Width;
+            return (x, y);
         }
     }
 
