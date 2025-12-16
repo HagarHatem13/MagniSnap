@@ -54,6 +54,7 @@ namespace MagniSnap
                 string OpenedFilePath = openFileDialog1.FileName;
                 ImageMatrix = ImageToolkit.OpenImage(OpenedFilePath);
                 ImageToolkit.ViewImage(ImageMatrix, mainPictureBox);
+                //function struct graph b3d ta3deel 
 
                 int width = ImageToolkit.GetWidth(ImageMatrix);
                 txtWidth.Text = width.ToString();
@@ -86,6 +87,7 @@ namespace MagniSnap
 
         private void mainPictureBox_MouseClick(object sender, MouseEventArgs e)
         {
+            //hn7ot el function shortest path we m3aha set anchor id we boundarys
             if (e.Button == MouseButtons.Left)
             {
                 if (ImageMatrix != null && isLassoEnabled)
@@ -101,6 +103,7 @@ namespace MagniSnap
         {
             txtMousePosX.Text = e.X.ToString();
             txtMousePosY.Text = e.Y.ToString();
+            // han3mel if condition running dijkstra we compute shortest path we backtrack path
 
             if (ImageMatrix != null && isLassoEnabled)
             {

@@ -1,13 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
+using MagniSnap;
 
 namespace MagniSnap
 {
-
-
     /// <summary>
     /// Holds the pixel color in 3 byte values: red, green and blue
     /// </summary>
@@ -35,305 +33,6 @@ namespace MagniSnap
     /// <summary>
     /// Library of static functions that deal with images
     /// </summary>
-    //Salma&Dania
-    public class PixelGraph
-    {
-        public int Width { get; }
-        public int Height { get; }
-
-        // Graph[nodeId] = list of (neighborId, weight)
-        public List<(int neighborId, double weight)>[] Graph { get; }
-
-        public PixelGraph(int width, int height)
-        {
-            if (width <= 0) throw new ArgumentException(nameof(width));
-            if (height <= 0) throw new ArgumentException(nameof(height));
-
-            Width = width;
-            Height = height;
-
-            int totalNodes = width * height;
-
-            Graph = new List<(int, double)>[totalNodes];
-
-            for (int i = 0; i < totalNodes; i++)
-                Graph[i] = new List<(int, double)>();
-        }
-        public class PixelGraphBuilder
-        {
-            public PixelGraph BuildGraph(RGBPixel[,] ImageMatrix)
-            {
-                int H = ImageToolkit.GetHeight(ImageMatrix);
-                int W = ImageToolkit.GetWidth(ImageMatrix);
-
-                PixelGraph graph = new PixelGraph(W, H);
-
-                // Loop through all pixels
-                for (int y = 0; y < H; y++)
-                {
-                    for (int x = 0; x < W; x++)
-                    {
-                        int currentID = y * W + x;
-
-                        // TEMPLATE FUNCTION — returns edge energy to RIGHT (X) and DOWN (Y)
-                        Vector2D e = ImageToolkit.CalculatePixelEnergies(x, y, ImageMatrix);
-
-                        // Add RIGHT neighbor (x+1, y)
-                        if (x + 1 < W)
-                        {
-                            int rightID = y * W + (x + 1);
-                            double weight = 1.0 / (e.X + 0.000001); // convert energy -> weight
-                            graph.AddUndirectedEdge(currentID, rightID, weight);
-                        }
-
-                        // Add DOWN neighbor (x, y+1)
-                        if (y + 1 < H)
-                        {
-                            int downID = (y + 1) * W + x;
-                            double weight = 1.0 / (e.Y + 0.000001);
-                            graph.AddUndirectedEdge(currentID, downID, weight);
-                        }
-                    }
-                }
-
-                return graph;
-            }
-        }
-
-
-        /// <summary>
-        /// Add UNDIRECTED edge (adds both A->B and B->A).
-        ///</summary>
-        public void AddUndirectedEdge(int u, int v, double weight)
-        {
-            Graph[u].Add((v, weight));
-            Graph[v].Add((u, weight));
-        }
-
-       
-        private class MinHeap
-        {
-            private List<(int vertex, double distance)> heap;
-            private int size;
-
-            public MinHeap()
-            {
-                heap = new List<(int, double)>();
-                size = 0;
-            }
-
-            public int Count => size;
-
-            public bool IsEmpty => size == 0;
-
-            public void Insert(int vertex, double distance)
-            {
-                if (size < heap.Count)
-                {
-                    heap[size] = (vertex, distance);
-                }
-                else
-                {
-                    heap.Add((vertex, distance));
-                }
-                size++;
-                HeapifyUp(size - 1);
-            }
-
-            public (int vertex, double distance) ExtractMin()
-            {
-                if (size == 0)
-                    throw new InvalidOperationException("Heap is empty");
-
-                (int vertex, double distance) min = heap[0];
-                heap[0] = heap[size - 1];
-                size--;
-
-                if (size > 0)
-                    HeapifyDown(0);
-
-                return min;
-            }
-
-            private void HeapifyUp(int index)
-            {
-                while (index > 0)
-                {
-                    int parent = (index - 1) / 2;
-                    if (heap[parent].distance <= heap[index].distance)
-                        break;
-
-                    Swap(parent, index);
-                    index = parent;
-                }
-            }
-
-            private void HeapifyDown(int index)
-            {
-                while (true)
-                {
-                    int smallest = index;
-                    int left = 2 * index + 1;
-                    int right = 2 * index + 2;
-
-                    if (left < size && heap[left].distance < heap[smallest].distance)
-                        smallest = left;
-
-                    if (right < size && heap[right].distance < heap[smallest].distance)
-                        smallest = right;
-
-                    if (smallest == index)
-                        break;
-
-                    Swap(index, smallest);
-                    index = smallest;
-                }
-            }
-
-            private void Swap(int i, int j)
-            {
-                var temp = heap[i];
-                heap[i] = heap[j];
-                heap[j] = temp;
-            }
-        }
-
-        /// <summary>
-        /// Calculate shortest paths from an anchor pixel to all pixels using Dijkstra's algorithm.
-        /// Time complexity: O(E' lg(V')) where V' and E' are vertices and edges checked until reaching destination.
-        /// </summary>
-        /// <param name="anchorPixelId">The ID of the anchor pixel (vertex)</param>
-        /// <returns>
-        /// A tuple containing:
-        /// - distances: array of shortest distances from anchor to each pixel (double.MaxValue if unreachable)
-        /// - parents: array of parent vertex IDs for path reconstruction (-1 if no parent)
-        /// </returns>
-        public (double[] distances, int[] parents) CalculateShortestPathsFromAnchor(int anchorPixelId)
-        {
-            int totalNodes = Width * Height;
-            
-            if (anchorPixelId < 0 || anchorPixelId >= totalNodes)
-                throw new ArgumentException("Invalid anchor pixel ID", nameof(anchorPixelId));
-
-            // Initialize distances and parents
-            double[] distances = new double[totalNodes];
-            int[] parents = new int[totalNodes];
-            bool[] visited = new bool[totalNodes];
-
-            for (int i = 0; i < totalNodes; i++)
-            {
-                distances[i] = double.MaxValue;
-                parents[i] = -1;
-                visited[i] = false;
-            }
-
-            distances[anchorPixelId] = 0.0;
-
-            // Use min-heap as priority queue
-            MinHeap priorityQueue = new MinHeap();
-            priorityQueue.Insert(anchorPixelId, 0.0);
-
-            while (!priorityQueue.IsEmpty)
-            {
-                // Extract minimum distance vertex
-                var (u, dist) = priorityQueue.ExtractMin();
-
-                // Skip if already processed or if this entry is stale (distance doesn't match)
-                if (visited[u] || dist > distances[u])
-                    continue;
-
-                visited[u] = true;
-
-                // Relax all neighbors
-                foreach (var (neighborId, weight) in Graph[u])
-                {
-                    if (!visited[neighborId])
-                    {
-                        double newDistance = distances[u] + weight;
-
-                        if (newDistance < distances[neighborId])
-                        {
-                            distances[neighborId] = newDistance;
-                            parents[neighborId] = u;
-
-                            // Add new entry (duplicates are allowed, we'll skip stale ones)
-                            priorityQueue.Insert(neighborId, newDistance);
-                        }
-                    }
-                }
-            }
-
-            return (distances, parents);
-        }
-
-        /// <summary>
-        /// Backtrack the shortest path from a free point (mouse position) to the anchor point.
-        /// Time complexity: O(N) where N is the length of the path.
-        /// </summary>
-        /// <param name="freePointId">The ID of the free point (mouse position pixel)</param>
-        /// <param name="parents">The parent array from CalculateShortestPathsFromAnchor</param>
-        /// <param name="anchorPixelId">The ID of the anchor pixel</param>
-        /// <returns>
-        /// A list of pixel IDs representing the path from freePointId to anchorPixelId.
-        /// Returns empty list if no path exists.
-        /// </returns>
-        public List<int> BacktrackPath(int freePointId, int[] parents, int anchorPixelId)
-        {
-            List<int> path = new List<int>();
-
-            if (freePointId < 0 || freePointId >= Width * Height)
-                return path;
-
-            if (parents == null || parents.Length != Width * Height)
-                throw new ArgumentException("Invalid parents array", nameof(parents));
-
-            // Backtrack from free point to anchor
-            int current = freePointId;
-            bool reachedAnchor = false;
-
-            while (current != -1)
-            {
-                path.Add(current);
-
-                if (current == anchorPixelId)
-                {
-                    reachedAnchor = true;
-                    break;
-                }
-
-                current = parents[current];
-            }
-
-            // If we didn't reach the anchor, no valid path exists
-            if (!reachedAnchor)
-                path.Clear();
-
-            return path;
-        }
-
-        /// <summary>
-        /// Convert pixel coordinates (x, y) to pixel ID
-        /// </summary>
-        public int PixelToId(int x, int y)
-        {
-            if (x < 0 || x >= Width || y < 0 || y >= Height)
-                throw new ArgumentException("Invalid pixel coordinates");
-            return y * Width + x;
-        }
-
-        /// <summary>
-        /// Convert pixel ID to pixel coordinates (x, y)
-        /// </summary>
-        public (int x, int y) IdToPixel(int pixelId)
-        {
-            if (pixelId < 0 || pixelId >= Width * Height)
-                throw new ArgumentException("Invalid pixel ID");
-            int y = pixelId / Width;
-            int x = pixelId % Width;
-            return (x, y);
-        }
-    }
-
     public class ImageToolkit
     {
         /// <summary>
@@ -647,12 +346,144 @@ namespace MagniSnap
 
                 gradient.X = pixelGrayVal - rightPixelGrayVal;
             }
-            
+
             return gradient;
         }
 
 
         #endregion
-    }
 
+
+        public static class LiveWireProcessor
+        {
+            /* =====================================================
+             * 1) Preprocess Image (Gaussian Smoothing)
+             * ===================================================== */
+            public static RGBPixel[,] PreprocessImage(RGBPixel[,] image)
+            {
+                return ImageToolkit.GaussianFilter1D(image, 5, 1.0);
+            }
+
+            /* =====================================================
+             * 2) Compute Energy Map
+             * ===================================================== */
+            public static Vector2D[,] ComputeEnergyMap(RGBPixel[,] image)
+            {
+                int height = ImageToolkit.GetHeight(image);
+                int width = ImageToolkit.GetWidth(image);
+
+                Vector2D[,] energyMap = new Vector2D[height, width];
+
+                for (int y = 0; y < height; y++)
+                    for (int x = 0; x < width; x++)
+                        energyMap[y, x] =
+                            ImageToolkit.CalculatePixelEnergies(x, y, image);
+
+                return energyMap;
+            }
+
+            /* =====================================================
+             * 3) Build Cost Graph  ( W = 1 / G )
+             * ===================================================== */
+            public static double[,] BuildCostGraph(Vector2D[,] energyMap)
+            {
+                int height = energyMap.GetLength(0);
+                int width = energyMap.GetLength(1);
+
+                double[,] cost = new double[height, width];
+
+                for (int y = 0; y < height; y++)
+                    for (int x = 0; x < width; x++)
+                        cost[y, x] =
+                            1.0 / (energyMap[y, x].X + energyMap[y, x].Y + 0.0001);
+
+                return cost;
+            }
+
+            /* =====================================================
+             * 4) Dijkstra Shortest Path from Anchor
+             * ===================================================== */
+            public static void ComputeShortestPaths(
+                double[,] cost,
+                int anchorX, int anchorY,
+                out double[,] dist,
+                out Point[,] parent)
+            {
+                int height = cost.GetLength(0);
+                int width = cost.GetLength(1);
+
+                dist = new double[height, width];
+                parent = new Point[height, width];
+                bool[,] visited = new bool[height, width];
+
+                for (int y = 0; y < height; y++)
+                    for (int x = 0; x < width; x++)
+                        dist[y, x] = double.MaxValue;
+
+                dist[anchorY, anchorX] = 0;
+
+                int[] dx = { -1, 1, 0, 0 };
+                int[] dy = { 0, 0, -1, 1 };
+
+                for (int k = 0; k < height * width; k++)
+                {
+                    double min = double.MaxValue;
+                    int cx = 0, cy = 0;
+
+                    for (int y = 0; y < height; y++)
+                        for (int x = 0; x < width; x++)
+                            if (!visited[y, x] && dist[y, x] < min)
+                            {
+                                min = dist[y, x];
+                                cx = x;
+                                cy = y;
+                            }
+
+                    visited[cy, cx] = true;
+
+                    for (int i = 0; i < 4; i++)
+                    {
+                        int nx = cx + dx[i];
+                        int ny = cy + dy[i];
+
+                        if (nx >= 0 && ny >= 0 &&
+                            nx < width && ny < height)
+                        {
+                            double newDist =
+                                dist[cy, cx] + cost[ny, nx];
+
+                            if (newDist < dist[ny, nx])
+                            {
+                                dist[ny, nx] = newDist;
+                                parent[ny, nx] = new Point(cx, cy);
+                            }
+                        }
+                    }
+                }
+            }
+
+            /* =====================================================
+             * 5) Backtrack & Draw Path
+             * ===================================================== */
+            public static void DrawPath(
+                RGBPixel[,] image,
+                Point[,] parent,
+                int freeX, int freeY)
+            {
+                int x = freeX;
+                int y = freeY;
+
+                while (parent[y, x] != Point.Empty)
+                {
+                    image[y, x].red = 255;
+                    image[y, x].green = 0;
+                    image[y, x].blue = 0;
+
+                    Point p = parent[y, x];
+                    x = p.X;
+                    y = p.Y;
+                }
+            }
+        }
+    }
 }
