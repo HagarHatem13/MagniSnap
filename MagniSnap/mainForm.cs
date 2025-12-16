@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
+using static MagniSnap.ImageToolkit;
 
 namespace MagniSnap
 {
@@ -11,6 +12,17 @@ namespace MagniSnap
     {
         RGBPixel[,] ImageMatrix;
         bool isLassoEnabled = false;
+
+        RGBPixel[,] fixedImage;
+        Vector2D[,] EnergyMap;
+        double[,] CostGraph;
+        double[,] Dist;
+        Point[,] Parent;
+
+        int anchorX = -1;
+        int anchorY = -1;
+        bool hasAnchor = false;
+
 
         public MainForm()
         {
@@ -54,7 +66,18 @@ namespace MagniSnap
                 string OpenedFilePath = openFileDialog1.FileName;
                 ImageMatrix = ImageToolkit.OpenImage(OpenedFilePath);
                 ImageToolkit.ViewImage(ImageMatrix, mainPictureBox);
-                //function struct graph b3d ta3deel 
+                // add here function struct graph b3d ta3deel 
+                fixedImage = (RGBPixel[,])ImageMatrix.Clone();
+
+                RGBPixel[,] smooth =
+                    LiveWireProcessor.PreprocessImage(ImageMatrix);
+
+                EnergyMap =
+                    LiveWireProcessor.ComputeEnergyMap(smooth);
+
+                CostGraph =
+                    LiveWireProcessor.BuildCostGraph(EnergyMap);
+                //////////////////////////////////////////////////////
 
                 int width = ImageToolkit.GetWidth(ImageMatrix);
                 txtWidth.Text = width.ToString();
@@ -87,7 +110,42 @@ namespace MagniSnap
 
         private void mainPictureBox_MouseClick(object sender, MouseEventArgs e)
         {
-            //hn7ot el function shortest path we m3aha set anchor id we boundarys
+            //add here hn7ot el function shortest path we m3aha set anchor id we boundarys
+            if (!hasAnchor)
+            {
+                anchorX = e.X;
+                anchorY = e.Y;
+
+                LiveWireProcessor.ComputeShortestPaths(
+                    CostGraph,
+                    anchorX, anchorY,
+                    out Dist,
+                    out Parent);
+
+                hasAnchor = true;
+            }
+            else
+            {
+                var path =
+                    LiveWireProcessor.Backtrack(
+                        Parent, e.X, e.Y);
+
+                LiveWireProcessor.DrawPath(
+                    fixedImage, path);
+
+                anchorX = e.X;
+                anchorY = e.Y;
+
+                LiveWireProcessor.ComputeShortestPaths(
+                    CostGraph,
+                    anchorX, anchorY,
+                    out Dist,
+                    out Parent);
+
+                ImageToolkit.ViewImage(
+                    fixedImage, mainPictureBox);
+            }
+        
             if (e.Button == MouseButtons.Left)
             {
                 if (ImageMatrix != null && isLassoEnabled)
@@ -103,8 +161,41 @@ namespace MagniSnap
         {
             txtMousePosX.Text = e.X.ToString();
             txtMousePosY.Text = e.Y.ToString();
-            // han3mel if condition running dijkstra we compute shortest path we backtrack path
 
+            // add here han3mel if condition running dijkstra we compute shortest path we backtrack path
+            ////////////////////////////////////////////////////////////////////////////////////////////
+            int h = ImageToolkit.GetHeight(ImageMatrix);
+            int w = ImageToolkit.GetWidth(ImageMatrix);
+
+            int fx = e.X;
+            int fy = e.Y;
+
+            if (fx < 0) fx = 0;
+            if (fy < 0) fy = 0;
+            if (fx >= w) fx = w - 1;
+            if (fy >= h) fy = h - 1;
+            if (hasAnchor && CostGraph != null)
+            {
+                // if Parent is not computed yet OR anchor changed elsewhere, compute it now
+                if (Parent == null)
+                {
+                    LiveWireProcessor.ComputeShortestPaths(
+                        CostGraph,
+                        anchorX, anchorY,
+                        out Dist,
+                        out Parent);
+                }
+
+                // draw live path from free point -> anchor on a temp copy
+                RGBPixel[,] temp = (RGBPixel[,])fixedImage.Clone();
+
+                var livePath = LiveWireProcessor.Backtrack(Parent, fx, fy);
+                LiveWireProcessor.DrawPath(temp, livePath);
+
+                ImageToolkit.ViewImage(temp, mainPictureBox);
+            }
+            ////////////////////////////////////////////////////////////////////////////////////
+        
             if (ImageMatrix != null && isLassoEnabled)
             {
                 // Refresh to redraw points

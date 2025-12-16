@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
@@ -465,23 +466,27 @@ namespace MagniSnap
             /* =====================================================
              * 5) Backtrack & Draw Path
              * ===================================================== */
-            public static void DrawPath(
-                RGBPixel[,] image,
-                Point[,] parent,
-                int freeX, int freeY)
-            {
-                int x = freeX;
-                int y = freeY;
 
+            public static List<Point> Backtrack(Point[,] parent, int x, int y)
+            {
+                List<Point> path = new List<Point>();
                 while (parent[y, x] != Point.Empty)
                 {
-                    image[y, x].red = 255;
-                    image[y, x].green = 0;
-                    image[y, x].blue = 0;
-
+                    path.Add(new Point(x, y));
                     Point p = parent[y, x];
-                    x = p.X;
-                    y = p.Y;
+                    x = p.X; y = p.Y;
+                }
+                return path;
+            }
+
+            /* ================== PART 5 ================== */
+            public static void DrawPath(RGBPixel[,] img, List<Point> path)
+            {
+                foreach (var p in path)
+                {
+                    img[p.Y, p.X].red = 255;
+                    img[p.Y, p.X].green = 0;
+                    img[p.Y, p.X].blue = 0;
                 }
             }
         }
