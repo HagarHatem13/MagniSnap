@@ -67,6 +67,7 @@ namespace MagniSnap
                 ImageMatrix = ImageToolkit.OpenImage(OpenedFilePath);
                 ImageToolkit.ViewImage(ImageMatrix, mainPictureBox);
                 // add here function struct graph b3d ta3deel 
+                ////////////////////////////////////////////////////////////////////////
                 fixedImage = (RGBPixel[,])ImageMatrix.Clone();
 
                 RGBPixel[,] smooth =
@@ -110,6 +111,7 @@ namespace MagniSnap
 
         private void mainPictureBox_MouseClick(object sender, MouseEventArgs e)
         {
+            ///////////////////////////////////////////////////////////////////////////
        
             if (CostGraph == null || fixedImage == null)
                 return;
@@ -145,11 +147,14 @@ namespace MagniSnap
 
                 ImageToolkit.ViewImage(
                     fixedImage, mainPictureBox);
+                ///////////////////////////////////////////////
             }
         }
 
+
         private void mainPictureBox_MouseMove(object sender, MouseEventArgs e)
         {
+            //////////////////////////////////////////////////////////////////////////////
            
             if (ImageMatrix == null || fixedImage == null)
                 return;
@@ -179,6 +184,7 @@ namespace MagniSnap
                         out Dist,
                         out Parent);
                 }
+                ///////////////////////////////////////////////////////////////////////
 
                 RGBPixel[,] temp = (RGBPixel[,])fixedImage.Clone();
 
