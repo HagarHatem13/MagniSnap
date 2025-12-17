@@ -110,7 +110,10 @@ namespace MagniSnap
 
         private void mainPictureBox_MouseClick(object sender, MouseEventArgs e)
         {
-            //add here hn7ot el function shortest path we m3aha set anchor id we boundarys
+       
+            if (CostGraph == null || fixedImage == null)
+                return;
+
             if (!hasAnchor)
             {
                 anchorX = e.X;
@@ -127,11 +130,9 @@ namespace MagniSnap
             else
             {
                 var path =
-                    LiveWireProcessor.Backtrack(
-                        Parent, e.X, e.Y);
+                    LiveWireProcessor.Backtrack(Parent, e.X, e.Y);
 
-                LiveWireProcessor.DrawPath(
-                    fixedImage, path);
+                LiveWireProcessor.DrawPath(fixedImage, path);
 
                 anchorX = e.X;
                 anchorY = e.Y;
@@ -145,25 +146,17 @@ namespace MagniSnap
                 ImageToolkit.ViewImage(
                     fixedImage, mainPictureBox);
             }
-        
-            if (e.Button == MouseButtons.Left)
-            {
-                if (ImageMatrix != null && isLassoEnabled)
-                {
-
-                    // Refresh to redraw points
-                    mainPictureBox.Refresh();
-                }
-            }
         }
 
         private void mainPictureBox_MouseMove(object sender, MouseEventArgs e)
         {
+           
+            if (ImageMatrix == null || fixedImage == null)
+                return;
+
             txtMousePosX.Text = e.X.ToString();
             txtMousePosY.Text = e.Y.ToString();
 
-            // add here han3mel if condition running dijkstra we compute shortest path we backtrack path
-            ////////////////////////////////////////////////////////////////////////////////////////////
             int h = ImageToolkit.GetHeight(ImageMatrix);
             int w = ImageToolkit.GetWidth(ImageMatrix);
 
@@ -174,9 +167,10 @@ namespace MagniSnap
             if (fy < 0) fy = 0;
             if (fx >= w) fx = w - 1;
             if (fy >= h) fy = h - 1;
+
+           
             if (hasAnchor && CostGraph != null)
             {
-                // if Parent is not computed yet OR anchor changed elsewhere, compute it now
                 if (Parent == null)
                 {
                     LiveWireProcessor.ComputeShortestPaths(
@@ -186,7 +180,6 @@ namespace MagniSnap
                         out Parent);
                 }
 
-                // draw live path from free point -> anchor on a temp copy
                 RGBPixel[,] temp = (RGBPixel[,])fixedImage.Clone();
 
                 var livePath = LiveWireProcessor.Backtrack(Parent, fx, fy);
@@ -194,7 +187,9 @@ namespace MagniSnap
 
                 ImageToolkit.ViewImage(temp, mainPictureBox);
             }
-            ////////////////////////////////////////////////////////////////////////////////////
+        
+
+           
         
             if (ImageMatrix != null && isLassoEnabled)
             {

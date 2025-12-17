@@ -479,7 +479,9 @@ namespace MagniSnap
                 return path;
             }
 
-            /* ================== PART 5 ================== */
+         /// <summary>
+         /// //Bonus/////
+         
             public static void DrawPath(RGBPixel[,] img, List<Point> path)
             {
                 foreach (var p in path)
