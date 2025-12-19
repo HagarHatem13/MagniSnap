@@ -360,8 +360,10 @@ namespace MagniSnap
             /* =====================================================
              * 1) Preprocess Image (Gaussian Smoothing)
              * ===================================================== */
+            //daina we salma( getwidth and getheight,calculatepixelenergies)
             public static RGBPixel[,] PreprocessImage(RGBPixel[,] image)
             {
+
                 return ImageToolkit.GaussianFilter1D(image, 5, 1.0);
             }
 

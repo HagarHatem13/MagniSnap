@@ -147,7 +147,7 @@ namespace MagniSnap
 
                 ImageToolkit.ViewImage(
                     fixedImage, mainPictureBox);
-                ///////////////////////////////////////////////
+               /////////////////////////////////////////////////////////
             }
         }
 
