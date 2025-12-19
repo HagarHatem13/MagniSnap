@@ -107,35 +107,16 @@ namespace MagniSnap
             return Buffer;
         }
 
-        /// <summary>
-        /// Get the height of the image 
-        /// </summary>
-        /// <param name="ImageMatrix">2D array that contains the image</param>
-        /// <returns>Image Height</returns>
         public static int GetHeight(RGBPixel[,] ImageMatrix)
         {
             return ImageMatrix.GetLength(0);
         }
 
-        /// <summary>
-        /// Get the width of the image 
-        /// </summary>
-        /// <param name="ImageMatrix">2D array that contains the image</param>
-        /// <returns>Image Width</returns>
         public static int GetWidth(RGBPixel[,] ImageMatrix)
         {
             return ImageMatrix.GetLength(1);
         }
 
-        /// <summary>
-        /// Calculate edge energy between
-        ///     1. the given pixel and its right one (X)
-        ///     2. the given pixel and its bottom one (Y)
-        /// </summary>
-        /// <param name="x">pixel x-coordinate</param>
-        /// <param name="y">pixel y-coordinate</param>
-        /// <param name="ImageMatrix">colored image matrix</param>
-        /// <returns>edge energy with the right pixel (X) and with the bottom pixel (Y)</returns>
         public static Vector2D CalculatePixelEnergies(int x, int y, RGBPixel[,] ImageMatrix)
         {
             if (ImageMatrix == null) throw new Exception("image is not set!");
@@ -157,15 +138,8 @@ namespace MagniSnap
             return energy;
         }
 
-        /// <summary>
-        /// Display the given image on the given PictureBox object
-        /// </summary>
-        /// <param name="ImageMatrix">2D array that contains the image</param>
-        /// <param name="PicBox">PictureBox object to display the image on it</param>
         public static void ViewImage(RGBPixel[,] ImageMatrix, PictureBox PicBox)
         {
-            // Create Image:
-            //==============
             int Height = ImageMatrix.GetLength(0);
             int Width = ImageMatrix.GetLength(1);
 
@@ -201,14 +175,7 @@ namespace MagniSnap
             PicBox.Image = ImageBMP;
         }
 
-
-        /// <summary>
-        /// Apply Gaussian smoothing filter to enhance the edge detection 
-        /// </summary>
-        /// <param name="ImageMatrix">Colored image matrix</param>
-        /// <param name="filterSize">Gaussian mask size</param>
-        /// <param name="sigma">Gaussian sigma</param>
-        /// <returns>smoothed color image</returns>
+      
         public static RGBPixel[,] GaussianFilter1D(RGBPixel[,] ImageMatrix, int filterSize, double sigma)
         {
             int Height = GetHeight(ImageMatrix);
@@ -217,23 +184,16 @@ namespace MagniSnap
             RGBPixelD[,] VerFiltered = new RGBPixelD[Height, Width];
             RGBPixel[,] Filtered = new RGBPixel[Height, Width];
 
-
-            // Create Filter in Spatial Domain:
-            //=================================
-            //make the filter ODD size
             if (filterSize % 2 == 0) filterSize++;
 
             double[] Filter = new double[filterSize];
             #region Do Change Remove Template Code
             /// 08e850689d67340abacf2bc76d98212d
             #endregion
-            //Compute Filter in Spatial Domain :
-            //==================================
             double Sum1 = 0;
             int HalfSize = filterSize / 2;
             for (int y = -HalfSize; y <= HalfSize; y++)
             {
-                //Filter[y+HalfSize] = (1.0 / (Math.Sqrt(2 * 22.0/7.0) * Segma)) * Math.Exp(-(double)(y*y) / (double)(2 * Segma * Segma)) ;
                 Filter[y + HalfSize] = Math.Exp(-(double)(y * y) / (double)(2 * sigma * sigma));
                 Sum1 += Filter[y + HalfSize];
             }
@@ -244,8 +204,7 @@ namespace MagniSnap
             #region Do Change Remove Template Code
             /// 08e850689d67340abacf2bc76d98212d
             #endregion
-            //Filter Original Image Vertically:
-            //=================================
+
             int ii, jj;
             RGBPixelD Sum;
             RGBPixel Item1;
@@ -273,8 +232,7 @@ namespace MagniSnap
             #region Do Change Remove Template Code
             /// 08e850689d67340abacf2bc76d98212d
             #endregion
-            //Filter Resulting Image Horizontally:
-            //===================================
+
             for (int i = 0; i < Height; i++)
                 for (int j = 0; j < Width; j++)
                 {
@@ -300,15 +258,7 @@ namespace MagniSnap
             return Filtered;
         }
 
-
         #region Private Functions
-        /// <summary>
-        /// Calculate Gradient vector between the given pixel and its right and bottom ones
-        /// </summary>
-        /// <param name="x">pixel x-coordinate</param>
-        /// <param name="y">pixel y-coordinate</param>
-        /// <param name="ImageMatrix">colored image matrix</param>
-        /// <returns></returns>
         private static Vector2D CalculateGradientAtPixel(int x, int y, RGBPixel[,] ImageMatrix)
         {
             Vector2D gradient = new Vector2D();
@@ -318,7 +268,6 @@ namespace MagniSnap
 
             if (y == GetHeight(ImageMatrix) - 1)
             {
-                //boundary pixel.
                 for (int i = 0; i < 3; i++)
                 {
                     gradient.Y = 0;
@@ -328,43 +277,36 @@ namespace MagniSnap
             {
                 RGBPixel downPixel = ImageMatrix[y + 1, x];
                 double downPixelGrayVal = 0.21 * downPixel.red + 0.72 * downPixel.green + 0.07 * downPixel.blue;
-
                 gradient.Y = pixelGrayVal - downPixelGrayVal;
             }
+
             #region Do Change Remove Template Code
             /// 08e850689d67340abacf2bc76d98212d
             #endregion
+
             if (x == GetWidth(ImageMatrix) - 1)
             {
-                //boundary pixel.
                 gradient.X = 0;
-
             }
             else
             {
                 RGBPixel rightPixel = ImageMatrix[y, x + 1];
                 double rightPixelGrayVal = 0.21 * rightPixel.red + 0.72 * rightPixel.green + 0.07 * rightPixel.blue;
-
                 gradient.X = pixelGrayVal - rightPixelGrayVal;
             }
 
             return gradient;
         }
-
-
         #endregion
-
 
         public static class LiveWireProcessor
         {
             private const int MAX_RADIUS = 400; // safe, adjustable
-            // -------- reusable buffers (NO logic change) --------
             private static double[,] distBuf;
             private static Point[,] parentBuf;
             private static bool[,] visitedBuf;
             private static int bufH = -1, bufW = -1;
 
-            // -------- min heap (internal, not exposed) --------
             private struct Node
             {
                 public int x, y;
@@ -423,17 +365,11 @@ namespace MagniSnap
                 }
             }
 
-            // =====================================================
-            // 1) Preprocess Image (UNCHANGED)
-            // =====================================================
             public static RGBPixel[,] PreprocessImage(RGBPixel[,] image)
             {
                 return ImageToolkit.GaussianFilter1D(image, 5, 1.0);
             }
 
-            // =====================================================
-            // 2) Energy Map (UNCHANGED)
-            // =====================================================
             public static Vector2D[,] ComputeEnergyMap(RGBPixel[,] image)
             {
                 int h = ImageToolkit.GetHeight(image);
@@ -447,9 +383,6 @@ namespace MagniSnap
                 return map;
             }
 
-            // =====================================================
-            // 3) Cost Graph (UNCHANGED)
-            // =====================================================
             public static double[,] BuildCostGraph(Vector2D[,] energyMap)
             {
                 int h = energyMap.GetLength(0);
@@ -463,14 +396,11 @@ namespace MagniSnap
                 return cost;
             }
 
-            // =====================================================
-            // 4) SHORTEST PATH (OPTIMIZED, SAME LOGIC)
-            // =====================================================
             public static void ComputeShortestPaths(
-    double[,] cost,
-    int anchorX, int anchorY,
-    out double[,] dist,
-    out Point[,] parent)
+                double[,] cost,
+                int anchorX, int anchorY,
+                out double[,] dist,
+                out Point[,] parent)
             {
                 int h = cost.GetLength(0);
                 int w = cost.GetLength(1);
@@ -538,10 +468,6 @@ namespace MagniSnap
                 parent = parentBuf;
             }
 
-
-            // =====================================================
-            // 5) BACKTRACK & DRAW (UNCHANGED)
-            // =====================================================
             public static List<Point> Backtrack(Point[,] parent, int x, int y)
             {
                 List<Point> path = new List<Point>();
@@ -578,10 +504,15 @@ namespace MagniSnap
                 DrawPathOptimized(img, path, 255, 0, 0);
             }
         }
+        public static void ViewImageSafe(RGBPixel[,] ImageMatrix, PictureBox PicBox)
+        {
+            Image old = PicBox.Image;
+            ViewImage(ImageMatrix, PicBox);
 
+            if (old != null && !ReferenceEquals(old, PicBox.Image))
+                old.Dispose();
+        }
     }
 }
-
-
 
 
