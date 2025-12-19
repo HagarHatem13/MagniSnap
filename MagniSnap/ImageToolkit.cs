@@ -481,7 +481,7 @@ namespace MagniSnap
                 return path;
             }
 
-         /// <summary>
+         /// <summary> ////
          /// //Bonus/////
          
             public static void DrawPath(RGBPixel[,] img, List<Point> path)
