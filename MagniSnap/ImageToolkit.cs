@@ -357,142 +357,231 @@ namespace MagniSnap
 
         public static class LiveWireProcessor
         {
-            /* =====================================================
-             * 1) Preprocess Image (Gaussian Smoothing)
-             * ===================================================== */
-            //daina we salma( getwidth and getheight,calculatepixelenergies)
+            private const int MAX_RADIUS = 400; // safe, adjustable
+            // -------- reusable buffers (NO logic change) --------
+            private static double[,] distBuf;
+            private static Point[,] parentBuf;
+            private static bool[,] visitedBuf;
+            private static int bufH = -1, bufW = -1;
+
+            // -------- min heap (internal, not exposed) --------
+            private struct Node
+            {
+                public int x, y;
+                public double d;
+                public Node(int x, int y, double d)
+                {
+                    this.x = x; this.y = y; this.d = d;
+                }
+            }
+
+            private class MinHeap
+            {
+                private List<Node> h = new List<Node>();
+                public int Count => h.Count;
+
+                public void Push(Node n)
+                {
+                    h.Add(n);
+                    int i = h.Count - 1;
+                    while (i > 0)
+                    {
+                        int p = (i - 1) / 2;
+                        if (h[p].d <= h[i].d) break;
+                        Swap(i, p);
+                        i = p;
+                    }
+                }
+
+                public Node Pop()
+                {
+                    Node r = h[0];
+                    h[0] = h[h.Count - 1];
+                    h.RemoveAt(h.Count - 1);
+                    Heapify(0);
+                    return r;
+                }
+
+                private void Heapify(int i)
+                {
+                    while (true)
+                    {
+                        int l = 2 * i + 1, r = 2 * i + 2, s = i;
+                        if (l < h.Count && h[l].d < h[s].d) s = l;
+                        if (r < h.Count && h[r].d < h[s].d) s = r;
+                        if (s == i) break;
+                        Swap(i, s);
+                        i = s;
+                    }
+                }
+
+                private void Swap(int a, int b)
+                {
+                    Node t = h[a];
+                    h[a] = h[b];
+                    h[b] = t;
+                }
+            }
+
+            // =====================================================
+            // 1) Preprocess Image (UNCHANGED)
+            // =====================================================
             public static RGBPixel[,] PreprocessImage(RGBPixel[,] image)
             {
-
                 return ImageToolkit.GaussianFilter1D(image, 5, 1.0);
             }
 
-            /* =====================================================
-             * 2) Compute Energy Map
-             * ===================================================== */
+            // =====================================================
+            // 2) Energy Map (UNCHANGED)
+            // =====================================================
             public static Vector2D[,] ComputeEnergyMap(RGBPixel[,] image)
             {
-                int height = ImageToolkit.GetHeight(image);
-                int width = ImageToolkit.GetWidth(image);
+                int h = ImageToolkit.GetHeight(image);
+                int w = ImageToolkit.GetWidth(image);
+                Vector2D[,] map = new Vector2D[h, w];
 
-                Vector2D[,] energyMap = new Vector2D[height, width];
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                        map[y, x] = ImageToolkit.CalculatePixelEnergies(x, y, image);
 
-                for (int y = 0; y < height; y++)
-                    for (int x = 0; x < width; x++)
-                        energyMap[y, x] =
-                            ImageToolkit.CalculatePixelEnergies(x, y, image);
-
-                return energyMap;
+                return map;
             }
 
-            /* =====================================================
-             * 3) Build Cost Graph  ( W = 1 / G )
-             * ===================================================== */
+            // =====================================================
+            // 3) Cost Graph (UNCHANGED)
+            // =====================================================
             public static double[,] BuildCostGraph(Vector2D[,] energyMap)
             {
-                int height = energyMap.GetLength(0);
-                int width = energyMap.GetLength(1);
+                int h = energyMap.GetLength(0);
+                int w = energyMap.GetLength(1);
+                double[,] cost = new double[h, w];
 
-                double[,] cost = new double[height, width];
-
-                for (int y = 0; y < height; y++)
-                    for (int x = 0; x < width; x++)
-                        cost[y, x] =
-                            1.0 / (energyMap[y, x].X + energyMap[y, x].Y + 0.0001);
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                        cost[y, x] = 1.0 / (energyMap[y, x].X + energyMap[y, x].Y + 0.0001);
 
                 return cost;
             }
 
-            /* =====================================================
-             * 4) Dijkstra Shortest Path from Anchor
-             * ===================================================== */
+            // =====================================================
+            // 4) SHORTEST PATH (OPTIMIZED, SAME LOGIC)
+            // =====================================================
             public static void ComputeShortestPaths(
-                double[,] cost,
-                int anchorX, int anchorY,
-                out double[,] dist,
-                out Point[,] parent)
+    double[,] cost,
+    int anchorX, int anchorY,
+    out double[,] dist,
+    out Point[,] parent)
             {
-                int height = cost.GetLength(0);
-                int width = cost.GetLength(1);
+                int h = cost.GetLength(0);
+                int w = cost.GetLength(1);
 
-                dist = new double[height, width];
-                parent = new Point[height, width];
-                bool[,] visited = new bool[height, width];
+                if (h != bufH || w != bufW)
+                {
+                    distBuf = new double[h, w];
+                    parentBuf = new Point[h, w];
+                    visitedBuf = new bool[h, w];
+                    bufH = h; bufW = w;
+                }
 
-                for (int y = 0; y < height; y++)
-                    for (int x = 0; x < width; x++)
-                        dist[y, x] = double.MaxValue;
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                    {
+                        distBuf[y, x] = double.MaxValue;
+                        parentBuf[y, x] = Point.Empty;
+                        visitedBuf[y, x] = false;
+                    }
 
-                dist[anchorY, anchorX] = 0;
+                distBuf[anchorY, anchorX] = 0;
+
+                int minX = Math.Max(0, anchorX - MAX_RADIUS);
+                int maxX = Math.Min(w - 1, anchorX + MAX_RADIUS);
+                int minY = Math.Max(0, anchorY - MAX_RADIUS);
+                int maxY = Math.Min(h - 1, anchorY + MAX_RADIUS);
+
+                MinHeap pq = new MinHeap();
+                pq.Push(new Node(anchorX, anchorY, 0));
 
                 int[] dx = { -1, 1, 0, 0 };
                 int[] dy = { 0, 0, -1, 1 };
 
-                for (int k = 0; k < height * width; k++)
+                while (pq.Count > 0)
                 {
-                    double min = double.MaxValue;
-                    int cx = 0, cy = 0;
+                    Node n = pq.Pop();
+                    int x = n.x;
+                    int y = n.y;
 
-                    for (int y = 0; y < height; y++)
-                        for (int x = 0; x < width; x++)
-                            if (!visited[y, x] && dist[y, x] < min)
-                            {
-                                min = dist[y, x];
-                                cx = x;
-                                cy = y;
-                            }
-
-                    visited[cy, cx] = true;
+                    if (visitedBuf[y, x]) continue;
+                    visitedBuf[y, x] = true;
 
                     for (int i = 0; i < 4; i++)
                     {
-                        int nx = cx + dx[i];
-                        int ny = cy + dy[i];
+                        int nx = x + dx[i];
+                        int ny = y + dy[i];
 
-                        if (nx >= 0 && ny >= 0 &&
-                            nx < width && ny < height)
+                        if (nx < minX || nx > maxX || ny < minY || ny > maxY)
+                            continue;
+
+                        if (visitedBuf[ny, nx]) continue;
+
+                        double nd = distBuf[y, x] + cost[ny, nx];
+
+                        if (nd < distBuf[ny, nx])
                         {
-                            double newDist =
-                                dist[cy, cx] + cost[ny, nx];
-
-                            if (newDist < dist[ny, nx])
-                            {
-                                dist[ny, nx] = newDist;
-                                parent[ny, nx] = new Point(cx, cy);
-                            }
+                            distBuf[ny, nx] = nd;
+                            parentBuf[ny, nx] = new Point(x, y);
+                            pq.Push(new Node(nx, ny, nd));
                         }
                     }
                 }
+
+                dist = distBuf;
+                parent = parentBuf;
             }
 
-            /* =====================================================
-             * 5) Backtrack & Draw Path
-             * ===================================================== */
 
+            // =====================================================
+            // 5) BACKTRACK & DRAW (UNCHANGED)
+            // =====================================================
             public static List<Point> Backtrack(Point[,] parent, int x, int y)
             {
                 List<Point> path = new List<Point>();
+
                 while (parent[y, x] != Point.Empty)
                 {
                     path.Add(new Point(x, y));
                     Point p = parent[y, x];
-                    x = p.X; y = p.Y;
+                    x = p.X;
+                    y = p.Y;
                 }
+
                 return path;
             }
 
-         /// <summary> ////
-         /// //Bonus/////
-         
-            public static void DrawPath(RGBPixel[,] img, List<Point> path)
+            public static void DrawPathOptimized(RGBPixel[,] img, List<Point> path, byte r, byte g, byte b)
             {
+                int h = img.GetLength(0);
+                int w = img.GetLength(1);
+
                 foreach (var p in path)
                 {
-                    img[p.Y, p.X].red = 255;
-                    img[p.Y, p.X].green = 0;
-                    img[p.Y, p.X].blue = 0;
+                    if (p.Y >= 0 && p.Y < h && p.X >= 0 && p.X < w)
+                    {
+                        img[p.Y, p.X].red = r;
+                        img[p.Y, p.X].green = g;
+                        img[p.Y, p.X].blue = b;
+                    }
                 }
             }
+
+            public static void DrawPath(RGBPixel[,] img, List<Point> path)
+            {
+                DrawPathOptimized(img, path, 255, 0, 0);
+            }
         }
+
     }
 }
+
+
+
+

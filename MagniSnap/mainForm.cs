@@ -1,19 +1,19 @@
 ﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Collections.Generic;
 using static MagniSnap.ImageToolkit;
 
 namespace MagniSnap
 {
-    #region
-    /// 4d17639adfad0a300acd78759e07a4f2
-    #endregion
     public partial class MainForm : Form
     {
         RGBPixel[,] ImageMatrix;
         bool isLassoEnabled = false;
 
         RGBPixel[,] fixedImage;
+        RGBPixel[,] tempDisplayImage;
+
         Vector2D[,] EnergyMap;
         double[,] CostGraph;
         double[,] Dist;
@@ -23,19 +23,21 @@ namespace MagniSnap
         int anchorY = -1;
         bool hasAnchor = false;
 
+        private int lastMouseX = -1;
+        private int lastMouseY = -1;
+        private const int MOUSE_MOVE_THRESHOLD = 3;
 
         public MainForm()
         {
             InitializeComponent();
             indicator_pnl.Hide();
+
+            mainPictureBox.MouseClick += mainPictureBox_MouseClick;
+            mainPictureBox.MouseMove += mainPictureBox_MouseMove;
         }
 
         private void menuButton_Click(object sender, EventArgs e)
         {
-            #region Do Change Remove Template Code
-            /// 4d17639adfad0a300acd78759e07a4f2
-            #endregion
-
             indicator_pnl.Top = ((Control)sender).Top;
             indicator_pnl.Height = ((Control)sender).Height;
             indicator_pnl.Left = ((Control)sender).Left;
@@ -49,77 +51,71 @@ namespace MagniSnap
         }
 
         private void exitToolStripMenuItem_Click(object sender, EventArgs e)
-        {         
+        {
             Application.Exit();
         }
 
         private void openToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            #region Do Change Remove Template Code
-            /// 4d17639adfad0a300acd78759e07a4f2
-            #endregion
+            OpenFileDialog dlg = new OpenFileDialog();
+            if (dlg.ShowDialog() != DialogResult.OK)
+                return;
 
-            OpenFileDialog openFileDialog1 = new OpenFileDialog();
-            if (openFileDialog1.ShowDialog() == DialogResult.OK)
-            {
-                //Open the browsed image and display it
-                string OpenedFilePath = openFileDialog1.FileName;
-                ImageMatrix = ImageToolkit.OpenImage(OpenedFilePath);
-                ImageToolkit.ViewImage(ImageMatrix, mainPictureBox);
-                // add here function struct graph b3d ta3deel 
-                ////////////////////////////////////////////////////////////////////////
-                fixedImage = (RGBPixel[,])ImageMatrix.Clone();
+            ImageMatrix = ImageToolkit.OpenImage(dlg.FileName);
+            ImageToolkit.ViewImage(ImageMatrix, mainPictureBox);
 
-                RGBPixel[,] smooth =
-                    LiveWireProcessor.PreprocessImage(ImageMatrix);
+            fixedImage = (RGBPixel[,])ImageMatrix.Clone();
+            tempDisplayImage = (RGBPixel[,])fixedImage.Clone();
 
-                EnergyMap =
-                    LiveWireProcessor.ComputeEnergyMap(smooth);
+            RGBPixel[,] smooth = LiveWireProcessor.PreprocessImage(ImageMatrix);
+            EnergyMap = LiveWireProcessor.ComputeEnergyMap(smooth);
+            CostGraph = LiveWireProcessor.BuildCostGraph(EnergyMap);
 
-                CostGraph =
-                    LiveWireProcessor.BuildCostGraph(EnergyMap);
-                //////////////////////////////////////////////////////
+            txtWidth.Text = ImageToolkit.GetWidth(ImageMatrix).ToString();
+            txtHeight.Text = ImageToolkit.GetHeight(ImageMatrix).ToString();
 
-                int width = ImageToolkit.GetWidth(ImageMatrix);
-                txtWidth.Text = width.ToString();
-                int height = ImageToolkit.GetHeight(ImageMatrix);
-                txtHeight.Text = height.ToString();
-            }
+            hasAnchor = false;
+            anchorX = anchorY = -1;
+            lastMouseX = lastMouseY = -1;
         }
 
         private void clearToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            mainPictureBox.Refresh();
+            if (fixedImage == null) return;
+            ImageToolkit.ViewImage(fixedImage, mainPictureBox);
+            hasAnchor = false;
+            anchorX = anchorY = -1;
         }
 
         private void btnLivewire_Click(object sender, EventArgs e)
         {
             menuButton_Click(sender, e);
-
             mainPictureBox.Cursor = Cursors.Cross;
-
             isLassoEnabled = true;
         }
 
         private void btnLivewire_Leave(object sender, EventArgs e)
         {
             menuButton_Leave(sender, e);
-
             mainPictureBox.Cursor = Cursors.Default;
             isLassoEnabled = false;
         }
 
         private void mainPictureBox_MouseClick(object sender, MouseEventArgs e)
         {
-            ///////////////////////////////////////////////////////////////////////////
-       
-            if (CostGraph == null || fixedImage == null)
+            if (!isLassoEnabled || CostGraph == null || fixedImage == null)
                 return;
+
+            int w = fixedImage.GetLength(1);
+            int h = fixedImage.GetLength(0);
+
+            int fx = Math.Max(0, Math.Min(w - 1, e.X));
+            int fy = Math.Max(0, Math.Min(h - 1, e.Y));
 
             if (!hasAnchor)
             {
-                anchorX = e.X;
-                anchorY = e.Y;
+                anchorX = fx;
+                anchorY = fy;
 
                 LiveWireProcessor.ComputeShortestPaths(
                     CostGraph,
@@ -131,13 +127,11 @@ namespace MagniSnap
             }
             else
             {
-                var path =
-                    LiveWireProcessor.Backtrack(Parent, e.X, e.Y);
-
+                var path = LiveWireProcessor.Backtrack(Parent, fx, fy);
                 LiveWireProcessor.DrawPath(fixedImage, path);
 
-                anchorX = e.X;
-                anchorY = e.Y;
+                anchorX = fx;
+                anchorY = fy;
 
                 LiveWireProcessor.ComputeShortestPaths(
                     CostGraph,
@@ -145,63 +139,42 @@ namespace MagniSnap
                     out Dist,
                     out Parent);
 
-                ImageToolkit.ViewImage(
-                    fixedImage, mainPictureBox);
-               /////////////////////////////////////////////////////////
+                ImageToolkit.ViewImage(fixedImage, mainPictureBox);
+                Array.Copy(fixedImage, tempDisplayImage, fixedImage.Length);
             }
-        }
 
+            lastMouseX = lastMouseY = -1;
+        }
 
         private void mainPictureBox_MouseMove(object sender, MouseEventArgs e)
         {
-            //////////////////////////////////////////////////////////////////////////////
-           
-            if (ImageMatrix == null || fixedImage == null)
+            if (!hasAnchor || Parent == null || fixedImage == null)
                 return;
 
-            txtMousePosX.Text = e.X.ToString();
-            txtMousePosY.Text = e.Y.ToString();
+            int w = fixedImage.GetLength(1);
+            int h = fixedImage.GetLength(0);
 
-            int h = ImageToolkit.GetHeight(ImageMatrix);
-            int w = ImageToolkit.GetWidth(ImageMatrix);
+            int fx = Math.Max(0, Math.Min(w - 1, e.X));
+            int fy = Math.Max(0, Math.Min(h - 1, e.Y));
 
-            int fx = e.X;
-            int fy = e.Y;
+            txtMousePosX.Text = fx.ToString();
+            txtMousePosY.Text = fy.ToString();
 
-            if (fx < 0) fx = 0;
-            if (fy < 0) fy = 0;
-            if (fx >= w) fx = w - 1;
-            if (fy >= h) fy = h - 1;
+            if (lastMouseX != -1 &&
+                Math.Abs(fx - lastMouseX) < MOUSE_MOVE_THRESHOLD &&
+                Math.Abs(fy - lastMouseY) < MOUSE_MOVE_THRESHOLD)
+                return;
 
-           
-            if (hasAnchor && CostGraph != null)
-            {
-                if (Parent == null)
-                {
-                    LiveWireProcessor.ComputeShortestPaths(
-                        CostGraph,
-                        anchorX, anchorY,
-                        out Dist,
-                        out Parent);
-                }
-                ///////////////////////////////////////////////////////////////////////
+            lastMouseX = fx;
+            lastMouseY = fy;
 
-                RGBPixel[,] temp = (RGBPixel[,])fixedImage.Clone();
+            Array.Copy(fixedImage, tempDisplayImage, fixedImage.Length);
 
-                var livePath = LiveWireProcessor.Backtrack(Parent, fx, fy);
-                LiveWireProcessor.DrawPath(temp, livePath);
+            var livePath = LiveWireProcessor.Backtrack(Parent, fx, fy);
+            LiveWireProcessor.DrawPathOptimized(
+                tempDisplayImage, livePath, 255, 255, 0);
 
-                ImageToolkit.ViewImage(temp, mainPictureBox);
-            }
-        
-
-           
-        
-            if (ImageMatrix != null && isLassoEnabled)
-            {
-                // Refresh to redraw points
-                mainPictureBox.Refresh();
-            }
+            ImageToolkit.ViewImage(tempDisplayImage, mainPictureBox);
         }
     }
 }
