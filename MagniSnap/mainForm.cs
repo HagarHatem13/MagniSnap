@@ -27,6 +27,8 @@ namespace MagniSnap
         private int lastMouseY = -1;
         private const int MOUSE_MOVE_THRESHOLD = 3;
 
+
+
         public MainForm()
         {
             InitializeComponent();
@@ -87,7 +89,7 @@ namespace MagniSnap
             anchorX = anchorY = -1;
         }
 
-        // ================== LIVEWIRE ==================
+
 
         private void btnLivewire_Click(object sender, EventArgs e)
         {
@@ -141,7 +143,7 @@ namespace MagniSnap
                     out Dist,
                     out Parent);
 
-                // ✅ CHANGED AFTER LIVEWIRE ONLY
+               
                 ImageToolkit.ViewImageSafe(fixedImage, mainPictureBox);
 
                 Array.Copy(fixedImage, tempDisplayImage, fixedImage.Length);
@@ -177,7 +179,7 @@ namespace MagniSnap
             var livePath = LiveWireProcessor.Backtrack(Parent, fx, fy);
             LiveWireProcessor.DrawPathOptimized(tempDisplayImage, livePath, 255, 255, 0);
 
-            // ✅ CHANGED AFTER LIVEWIRE ONLY
+         
             ImageToolkit.ViewImageSafe(tempDisplayImage, mainPictureBox);
         }
     }
